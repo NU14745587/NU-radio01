@@ -1,174 +1,187 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Radio for Apple Music</title>
-  <!-- Apple MusicKit JS SDK -->
-  <script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js"></script>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-    .card { background: #1e1e1e; padding: 2rem; border-radius: 16px; width: 360px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); text-align: center; }
-    h2 { margin-top: 0; color: #fa2d48; }
-    input, button { width: 100%; padding: 10px; margin: 8px 0; border-radius: 8px; border: 1px solid #333; box-sizing: border-box; }
-    input { background: #2a2a2a; color: #fff; }
-    button { background: #fa2d48; color: #fff; font-weight: bold; border: none; cursor: pointer; transition: opacity 0.2s; }
-    button:hover { opacity: 0.9; }
-    .status { margin-top: 1rem; font-size: 0.85rem; color: #aaa; min-height: 2em; }
-    .now-playing { margin: 1.5rem 0; padding: 1rem; background: #2a2a2a; border-radius: 8px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Radio Station</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #1e1e1e;
+            padding: 30px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+        h1 {
+            color: #ff4757;
+            margin-bottom: 24px;
+            font-size: 1.8rem;
+        }
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-bottom: 8px;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background-color: #2a2a2a;
+            color: white;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            border-radius: 25px;
+            border: none;
+            background-color: #ff4757;
+            color: white;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: opacity 0.2s;
+        }
+        button:active {
+            opacity: 0.8;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #ccc;
+            line-height: 1.6;
+            min-height: 50px;
+            background: #252525;
+            padding: 12px;
+            border-radius: 8px;
+        }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <h1>📻 AI Radio Station</h1>
+        
+        <div class="input-group">
+            <label>OpenAI API Key</label>
+            <input type="password" id="openaiApiKey" placeholder="sk-...">
+        </div>
 
-<div class="card">
-  <h2>AI Radio Station</h2>
-  <div id="setup">
-    <input type="password" id="developerToken" placeholder="Apple Music Developer Token">
-    <input type="password" id="openaiKey" placeholder="OpenAI API Key">
-    <button onclick="initApp()">ラジオを開始する</button>
-  </div>
+        <button id="startBtn" onclick="startRadio()">ラジオを起動する</button>
+        <button id="talkBtn" onclick="generateAiTalk()" style="display:none; background-color: #2ed573;">🎙️ DJにトークさせる</button>
 
-  <div id="player" style="display:none;">
-    <div class="now-playing">
-      <div id="songTitle" style="font-weight:bold;">曲を読み込み中...</div>
-      <div id="artistName" style="color:#aaa; font-size:0.9rem;">-</div>
+        <div id="status">OpenAI API Keyを入力して「ラジオを起動する」を押してください</div>
     </div>
-    <button onclick="triggerDJSpeak()">📻 AIパーソナリティに喋らせる</button>
-    <button onclick="nextTrack()" style="background:#444;">次の曲へ</button>
-  </div>
 
-  <div class="status" id="statusLog">トークンを入力してスタートしてください</div>
-</div>
+    <!-- BGM用オーディオ -->
+    <audio id="bgm" loop src="https://actions.google.com/sounds/v1/ambiences/coffee_shop.ogg"></audio>
 
-<script>
-  let musicKit;
-  let audioCtx;
+    <script>
+        function startRadio() {
+            const openaiKey = document.getElementById('openaiApiKey').value;
+            if (!openaiKey) {
+                alert("OpenAI API Keyを入力してください");
+                return;
+            }
 
-  async function initApp() {
-    const devToken = document.getElementById('developerToken').value;
-    const openaiKey = document.getElementById('openaiKey').value;
+            // BGM再生
+            const bgm = document.getElementById('bgm');
+            bgm.volume = 0.2;
+            bgm.play().catch(e => console.log("BGM再生失敗:", e));
 
-    if (!devToken || !openaiKey) {
-      alert('両方のキーを入力してください');
-      return;
-    }
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('talkBtn').style.display = 'block';
+            document.getElementById('status').innerText = "ラジオ放送中！\n「DJにトークさせる」を押すとAIが喋り出します。";
+        }
 
-    updateStatus('MusicKitを初期化中...');
+        async function generateAiTalk() {
+            const openaiKey = document.getElementById('openaiApiKey').value;
+            const statusDiv = document.getElementById('status');
 
-    try {
-      // 1. MusicKit JS 初期化
-      await MusicKit.configure({
-        developerToken: devToken,
-        app: { name: 'AI Radio App', build: '1.0.0' }
-      });
+            statusDiv.innerText = "🤔 DJが原稿を考えています...";
 
-      musicKit = MusicKit.getInstance();
-      
-      // 2. ユーザーログイン認証（Apple Music有料会員ログイン）
-      updateStatus('Apple Musicにログイン中...');
-      await musicKit.authorize();
+            try {
+                // OpenAI Chat Completion API
+                const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${openaiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        messages: [
+                            { role: 'system', content: 'あなたは深夜ラジオの明るく親しみやすいラジオDJです。聴衆に向けて挨拶と、心が温まるようなショートトークを2〜3文で軽快に話してください。' }
+                        ]
+                    })
+                });
 
-      document.getElementById('setup').style.display = 'none';
-      document.getElementById('player').style.display = 'block';
-      updateStatus('準備完了！ステーションを再生します。');
+                const gptData = await gptResponse.json();
+                if (gptData.error) {
+                    throw new Error(gptData.error.message);
+                }
+                const talkScript = gptData.choices[0].message.content;
 
-      // 3. イベントリスナー登録
-      musicKit.addEventListener('nowPlayingItemDidChange', onTrackChange);
+                statusDiv.innerText = `🎙️ 【DJトーク中】\n「${talkScript}」`;
 
-      // 試聴用：ヘビーローテーションやステーションのプレイリストをロードして再生
-      await musicKit.setQueue({ playlist: 'pl.f4d10a0b22a245348b212398288591a2' }); // サンプルリスト
-      await musicKit.play();
+                // OpenAI TTS API (音声合成)
+                const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${openaiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: 'tts-1',
+                        input: talkScript,
+                        voice: 'alloy'
+                    })
+                });
 
-    } catch (err) {
-      console.error(err);
-      updateStatus('エラーが発生しました: ' + err.message);
-    }
-  }
+                if (!ttsResponse.ok) {
+                    throw new Error("音声合成エラー");
+                }
 
-  function onTrackChange() {
-    const item = musicKit.nowPlayingItem;
-    if (item) {
-      document.getElementById('songTitle').innerText = item.title;
-      document.getElementById('artistName').innerText = item.artistName;
-      updateStatus(`再生中: ${item.title}`);
-    }
-  }
+                const blob = await ttsResponse.blob();
+                const audioUrl = URL.createObjectURL(blob);
+                const audio = new Audio(audioUrl);
+                
+                // トーク中はBGMの音量を少し下げる
+                const bgm = document.getElementById('bgm');
+                bgm.volume = 0.05;
+                
+                audio.play();
+                audio.onended = () => {
+                    bgm.volume = 0.2; // トークが終わったらBGMの音量を戻す
+                    statusDiv.innerText = "ラジオ放送中！\n「DJにトークさせる」を押すと再度喋ります。";
+                };
 
-  async function triggerDJSpeak() {
-    const openaiKey = document.getElementById('openaiKey').value;
-    const currentSong = musicKit.nowPlayingItem;
-    
-    if (!currentSong) return;
-
-    updateStatus('AI DJが原稿を考えています...');
-
-    // A. ChatGPTでDJトーク原稿作成
-    const prompt = `あなたは深夜ラジオの人気パーソナリティです。
-現在流れている曲「${currentSong.title}」（アーティスト: ${currentSong.artistName}）について、短くリスナーに語りかけるような魅力的な曲紹介トークを20秒以内で作ってください。`;
-
-    try {
-      const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openaiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
-      const gptData = await gptRes.json();
-      const speechText = gptData.choices[0].message.content;
-
-      updateStatus('AI DJの声を生成中...');
-
-      // B. OpenAI Audio (TTS) で音声化
-      const ttsRes = await fetch('https://api.openai.com/v1/audio/speech', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openaiKey}`
-        },
-        body: JSON.stringify({
-          model: 'tts-1',
-          input: speechText,
-          voice: 'onyx' // 深みのある男性DJ風ボイス（女性風なら 'nova' や 'shimmer'）
-        })
-      });
-
-      const audioBlob = await ttsRes.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const djAudio = new Audio(audioUrl);
-
-      // C. ダッキング処理（音楽音量を下げてトーク再生）
-      updateStatus('🎙️ AI DJが話しています...');
-      
-      // 音楽の音量を20%に下げる
-      musicKit.volume = 0.2;
-
-      djAudio.play();
-
-      djAudio.onended = () => {
-        // トーク終了後に音量を元に戻す
-        musicKit.volume = 1.0;
-        updateStatus(`再生中: ${currentSong.title}`);
-      };
-
-    } catch (err) {
-      console.error(err);
-      musicKit.volume = 1.0;
-      updateStatus('DJトーク生成エラー');
-    }
-  }
-
-  function nextTrack() {
-    musicKit.skipToNextItem();
-  }
-
-  function updateStatus(msg) {
-    document.getElementById('statusLog').innerText = msg;
-  }
-</script>
+            } catch (err) {
+                console.error(err);
+                statusDiv.innerText = "❌ エラーが発生しました。API Keyに間違いがないか確認してください。";
+            }
+        }
+    </script>
 </body>
 </html>
